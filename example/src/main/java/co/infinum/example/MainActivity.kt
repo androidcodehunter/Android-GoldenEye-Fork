@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.SurfaceTexture
+import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
@@ -35,8 +36,15 @@ import java.io.File
 import java.io.File.separator
 import java.io.FileOutputStream
 import java.io.OutputStream
+import java.util.*
 import java.util.concurrent.Executors
 import kotlin.math.min
+
+const val TAG = "MainActivity"
+const val SHUTTER_SOUND_AUDIO_FILE_PATH = "file:///system/media/audio/ui/camera_click.ogg"
+const val PREVIEW_DELAY = 100L
+const val DELAY_IMMEDIATE = 0L
+const val VIDEO_START_DELAY = 500L
 
 @SuppressLint("SetTextI18n")
 class MainActivity : AppCompatActivity() {
@@ -91,12 +99,16 @@ class MainActivity : AppCompatActivity() {
             goldenEye.takePicture(
                 onPictureTaken = { bitmap ->
                     if (bitmap.width <= 4096 && bitmap.height <= 4096) {
-                        saveImage(bitmap, "MyExperience" + java.util.Calendar.getInstance(), this)
                         displayPicture(bitmap)
                     } else {
                         reducePictureSize(bitmap)
                     }
-                },
+                    mainHandler.postDelayed(
+                            { saveImage(bitmap, "MyExperience" + Calendar.getInstance(), this) },
+                            DELAY_IMMEDIATE)
+                }, onShutter = {
+                playShutterSound()
+            },
                 onError = { it.printStackTrace() }
             )
         }
@@ -117,6 +129,15 @@ class MainActivity : AppCompatActivity() {
             openCamera(goldenEye.availableCameras[nextIndex])
         }
     }
+
+    private fun playShutterSound() {
+        val audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val volume = audioManager.getStreamMaxVolume(AudioManager.STREAM_NOTIFICATION)
+        if (volume != 0){
+            MediaPlayer.create(this, Uri.parse(SHUTTER_SOUND_AUDIO_FILE_PATH))?.start()
+        }
+    }
+
 
     private fun reducePictureSize(bitmap: Bitmap) {
         Executors.newSingleThreadExecutor().execute {
@@ -139,10 +160,7 @@ class MainActivity : AppCompatActivity() {
             setImageBitmap(bitmap)
             visibility = View.VISIBLE
         }
-        mainHandler.postDelayed(
-            { previewPictureView.visibility = View.GONE },
-            2000
-        )
+        previewPictureView.visibility = View.GONE
     }
 
     private fun initGoldenEye() {
@@ -252,7 +270,7 @@ class MainActivity : AppCompatActivity() {
                 mainHandler.postDelayed({
                     previewVideoContainer.visibility = View.GONE
                     release()
-                }, 1500)
+                }, VIDEO_START_DELAY)
             }
             setOnVideoSizeChangedListener { _, width, height ->
                 previewVideoView.apply {

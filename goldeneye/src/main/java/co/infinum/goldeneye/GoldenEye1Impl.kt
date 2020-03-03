@@ -119,6 +119,10 @@ internal class GoldenEye1Impl @JvmOverloads constructor(
                 callback.onPictureTaken(picture)
             }
 
+            override fun onShutter() {
+                callback.onShutter()
+            }
+
             override fun onError(t: Throwable) {
                 resetCameraPreview()
                 callback.onError(t)
